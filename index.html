@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AgriFeed & Rice Supply - Store POS & Inventory</title>
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#14532d">
+  <link rel="stylesheet" href="./styles.css">
+
+  <style>
+    /* Custom Scrollbar for fast cashier operation */
+    .custom-scrollbar::-webkit-scrollbar { width: 5px; height: 5px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+    /* Print styles for thermal POS printers or standard A4/A5 receipt printing */
+    @media print {
+      body * { visibility: hidden; }
+      #printable-receipt, #printable-receipt * { visibility: visible; }
+      #printable-receipt { 
+        position: absolute; 
+        left: 0; 
+        top: 0; 
+        width: 100%; 
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+      }
+    }
+
+    /* Radio button active style */
+    input[type="radio"]:checked + label {
+      border-color: #15803d;
+      background-color: #f0fdf4;
+      color: #14532d;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen flex flex-col antialiased selection:bg-brand-100 selection:text-brand-900">
+
+  <!-- TOP HEADER / STORE NAVIGATION HEADER -->
+  <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6">
+      <div class="flex items-center justify-between h-14 sm:h-16">
+        
+        <!-- Store Name & Branding -->
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded bg-brand-700 text-amber-300 font-black flex items-center justify-center text-lg shadow-inner">
+            🌾
+          </div>
+          <div>
+            <h1 class="font-bold text-base sm:text-lg leading-tight tracking-tight text-white">AgriFeed & Rice Supply</h1>
+            <p class="text-[11px] text-slate-400 font-medium">Store Operations System (Offline Mode)</p>
+          </div>
+        </div>
+
+        <!-- Terminal Status & Clock -->
+        <div class="flex items-center gap-3 sm:gap-6 text-xs">
+          <div class="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded bg-slate-800/80 border border-slate-700 text-slate-300">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span class="font-medium text-[11px]">System Ready</span>
+          </div>
+          <div id="nav-date-time" class="font-mono text-slate-300 text-[11px] sm:text-xs">
+            <!-- Dynamic Date/Time -->
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN SYSTEM CONTENT AREA -->
+  <div class="flex-1 max-w-7xl w-full mx-auto px-2 sm:px-6 py-3 sm:py-5 flex flex-col md:flex-row gap-4">
+
+    <!-- SIDEBAR / NAVIGATION TABS -->
+    <nav class="w-full md:w-56 lg:w-60 bg-white rounded-lg border border-slate-200 p-1.5 sm:p-2 shadow-sm flex md:flex-col justify-between md:justify-start gap-1 shrink-0 overflow-x-auto">
+      <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-btn flex items-center gap-2.5 px-3 py-2.5 rounded-md text-xs sm:text-sm font-semibold transition-colors w-full text-left">
+        <span class="text-base">📊</span>
+        <span class="whitespace-nowrap">Dashboard</span>
+      </button>
+
+      <button onclick="switchTab('pos')" id="nav-pos" class="nav-btn flex items-center gap-2.5 px-3 py-2.5 rounded-md text-xs sm:text-sm font-semibold transition-colors w-full text-left">
+        <span class="text-base">🖥️</span>
+        <span class="whitespace-nowrap">Point of Sale</span>
+      </button>
+
+      <button onclick="switchTab('inventory')" id="nav-inventory" class="nav-btn flex items-center gap-2.5 px-3 py-2.5 rounded-md text-xs sm:text-sm font-semibold transition-colors w-full text-left">
+        <span class="text-base">📦</span>
+        <span class="whitespace-nowrap">Inventory Stocks</span>
+      </button>
+
+      <button onclick="switchTab('credit')" id="nav-credit" class="nav-btn flex items-center gap-2.5 px-3 py-2.5 rounded-md text-xs sm:text-sm font-semibold transition-colors w-full text-left">
+        <span class="text-base">📖</span>
+        <span class="whitespace-nowrap">Credit Ledger</span>
+      </button>
+
+      <button onclick="switchTab('reports')" id="nav-reports" class="nav-btn flex items-center gap-2.5 px-3 py-2.5 rounded-md text-xs sm:text-sm font-semibold transition-colors w-full text-left">
+        <span class="text-base">📈</span>
+        <span class="whitespace-nowrap">Sales Reports</span>
+      </button>
+
+      <button onclick="switchTab('cashout')" id="nav-cashout" class="nav-btn flex items-center gap-2.5 px-3 py-2.5 rounded-md text-xs sm:text-sm font-semibold transition-colors w-full text-left">
+        <span class="text-base">💸</span>
+        <span class="whitespace-nowrap">Cash Out / Expenses</span>
+      </button>
+
+      <div class="hidden md:block mt-auto pt-4 border-t border-slate-100 text-[11px] text-slate-400 text-center">
+        <p class="font-medium text-slate-500">Local POS v1.1</p>
+        <button onclick="resetDataToDefault()" class="mt-2 text-[10px] text-red-600 hover:text-red-700 underline font-medium">Reset Demo Data</button>
+      </div>
+    </nav>
+
+    <!-- CONTENT MODULES -->
+    <main class="flex-1 min-w-0">
+
+      <!-- 1. DASHBOARD VIEW -->
+      <section id="view-dashboard" class="tab-view space-y-4">
+        
+        <!-- Welcome Header Card -->
+        <div class="bg-white border border-slate-200 rounded-lg p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h2 class="text-lg font-bold text-slate-900 tracking-tight">Store Overview & Operations</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Daily sales performance, open sacks monitoring, and stock alerts.</p>
+          </div>
+          <button onclick="switchTab('pos')" class="px-3.5 py-2 bg-brand-700 hover:bg-brand-800 text-white font-semibold text-xs rounded shadow-sm self-start sm:self-center transition-colors flex items-center gap-1.5">
+            <span>➕ New Sale</span>
+          </button>
+        </div>
+
+        <!-- Metrics Grid -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <!-- Sales Today -->
+          <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+            <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Today's Sales</p>
+            <p id="dash-sales-today" class="text-xl sm:text-2xl font-extrabold text-slate-900 mt-1 font-mono">₱0.00</p>
+            <p id="dash-sales-count" class="text-xs text-emerald-700 font-semibold mt-1">0 Transactions</p>
+          </div>
+
+          <!-- Total Sack Inventory -->
+          <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+            <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Stock In Store</p>
+            <p id="dash-total-sacks" class="text-xl sm:text-2xl font-extrabold text-slate-900 mt-1 font-mono">0 Bags</p>
+            <p id="dash-total-kilos" class="text-xs text-slate-500 mt-1 font-medium">+ 0 open sacks</p>
+          </div>
+
+          <!-- Total Utang / Credit -->
+          <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+            <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Credit Ledger</p>
+            <p id="dash-total-utang" class="text-xl sm:text-2xl font-extrabold text-red-600 mt-1 font-mono">₱0.00</p>
+            <p id="dash-utang-count" class="text-xs text-slate-500 mt-1 font-medium">0 Customers</p>
+          </div>
+
+          <!-- Cash in Cash Drawer -->
+          <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+            <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Cash in Drawer</p>
+            <p id="dash-cash-in-drawer" class="text-xl sm:text-2xl font-extrabold text-emerald-700 mt-1 font-mono">₱0.00</p>
+            <p class="text-xs text-slate-500 mt-1">Cash sales + collections − cash out</p>
+          </div>
+
+          <!-- Low Stock Alert -->
+          <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+            <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Stock Alerts</p>
+            <p id="dash-low-stock-count" class="text-xl sm:text-2xl font-extrabold text-amber-600 mt-1 font-mono">0 Items</p>
+            <p class="text-xs text-amber-700 font-semibold mt-1">Needs Re-order (At/Below Threshold)</p>
+          </div>
+        </div>
+
+        <!-- OPEN SACKS MONITORING SECTION -->
+        <div class="bg-white border border-amber-300 rounded-lg shadow-sm overflow-hidden">
+          <div class="bg-amber-50/80 px-4 py-3 border-b border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h3 class="font-bold text-amber-900 text-sm flex items-center gap-2">
+                <span>📂</span> Active Open Sack Monitor
+              </h3>
+              <p class="text-xs text-amber-800">Sacks currently open for per-kilo retail sales. Click "Mark Finished" when empty.</p>
+            </div>
+            <span class="text-[11px] font-bold bg-amber-200/80 text-amber-900 px-2.5 py-0.5 rounded border border-amber-300 self-start sm:self-center">
+              Per-Kilo Tracking
+            </span>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs sm:text-sm">
+              <thead class="bg-slate-50 text-slate-600 text-[11px] uppercase font-bold border-b border-slate-200">
+                <tr>
+                  <th class="py-2.5 px-4">Product / Brand</th>
+                  <th class="py-2.5 px-4">Sack Capacity</th>
+                  <th class="py-2.5 px-4">Price / Kilo</th>
+                  <th class="py-2.5 px-4 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody id="dash-open-sacks-table" class="divide-y divide-slate-200 bg-white">
+                <!-- Dynamic Rows -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- TWO COLUMN SECTION: LOW STOCK & RECENT SALES -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          
+          <!-- Low Stock Warning Table -->
+          <div class="bg-white rounded-lg border border-slate-200 shadow-sm p-4">
+            <div class="flex justify-between items-center mb-3 pb-2 border-b border-slate-100">
+              <h3 class="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+                <span>⚠️</span> Low Stock List
+              </h3>
+              <button onclick="switchTab('inventory')" class="text-xs font-semibold text-brand-700 hover:underline">View All</button>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-50 text-slate-500 uppercase font-bold">
+                  <tr>
+                    <th class="p-2">Item Name</th>
+                    <th class="p-2">Category</th>
+                    <th class="p-2 text-right">Stock / Limit</th>
+                  </tr>
+                </thead>
+                <tbody id="dash-low-stock-table" class="divide-y divide-slate-100">
+                  <!-- Dynamic Rows -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Recent Transactions -->
+          <div class="bg-white rounded-lg border border-slate-200 shadow-sm p-4">
+            <div class="flex justify-between items-center mb-3 pb-2 border-b border-slate-100">
+              <h3 class="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+                <span>🕒</span> Recent Transactions Today
+              </h3>
+              <button onclick="switchTab('reports')" class="text-xs font-semibold text-brand-700 hover:underline">View History</button>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-50 text-slate-500 uppercase font-bold">
+                  <tr>
+                    <th class="p-2">Time</th>
+                    <th class="p-2">Customer / Type</th>
+                    <th class="p-2 text-right">Amount</th>
+                  </tr>
+                </thead>
+                <tbody id="dash-recent-sales-table" class="divide-y divide-slate-100">
+                  <!-- Dynamic Rows -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+
+      </section>
+
+      <!-- 2. POINT OF SALE (POS) VIEW -->
+      <section id="view-pos" class="tab-view hidden">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          
+          <!-- Product Selector Left Column -->
+          <div class="lg:col-span-7 space-y-3">
+            <!-- Search & Filter Controls -->
+            <div class="bg-white p-3 rounded-lg border border-slate-200 shadow-sm flex flex-col sm:flex-row gap-2.5">
+              <div class="relative flex-1">
+                <span class="absolute left-3 top-2.5 text-slate-400 text-xs">🔍</span>
+                <input type="text" id="pos-search-input" onkeyup="filterPosProducts()" placeholder="Search Feeds, Rice, or Supplement..." class="w-full pl-8 pr-3 py-1.5 border border-slate-300 rounded text-xs sm:text-sm focus:ring-1 focus:ring-brand-600 focus:border-brand-600 focus:outline-none">
+              </div>
+              <div class="flex gap-1.5 overflow-x-auto">
+                <button onclick="filterPosCategory('All')" class="pos-cat-btn px-3 py-1.5 bg-brand-700 text-white rounded text-xs font-bold shadow-sm whitespace-nowrap" data-cat="All">All</button>
+                <button onclick="filterPosCategory('Feeds')" class="pos-cat-btn px-3 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded text-xs font-bold whitespace-nowrap" data-cat="Feeds">Feeds</button>
+                <button onclick="filterPosCategory('Rice')" class="pos-cat-btn px-3 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded text-xs font-bold whitespace-nowrap" data-cat="Rice">Rice</button>
+                <button onclick="filterPosCategory('Supplement')" class="pos-cat-btn px-3 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded text-xs font-bold whitespace-nowrap" data-cat="Supplement">Supplements</button>
+                <button onclick="filterPosCategory('Softdrinks')" class="pos-cat-btn px-3 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded text-xs font-bold whitespace-nowrap" data-cat="Softdrinks">Softdrinks</button>
+                <button onclick="filterPosCategory('Alcohol')" class="pos-cat-btn px-3 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded text-xs font-bold whitespace-nowrap" data-cat="Alcohol">Alcohol</button>
+                <button onclick="filterPosCategory('Cigarettes')" class="pos-cat-btn px-3 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded text-xs font-bold whitespace-nowrap" data-cat="Cigarettes">Cigarettes</button>
+                <button onclick="filterPosCategory('Others')" class="pos-cat-btn px-3 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded text-xs font-bold whitespace-nowrap" data-cat="Others">Others</button>
+              </div>
+            </div>
+
+            <!-- Products Grid -->
+            <div id="pos-product-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[calc(100vh-210px)] overflow-y-auto pr-1 custom-scrollbar">
+              <!-- Rendered Dynamically -->
+            </div>
+          </div>
+
+          <!-- Cart Right Column -->
+          <div class="lg:col-span-5 bg-white p-4 rounded-lg border border-slate-200 shadow-sm flex flex-col h-[calc(100vh-140px)] sticky top-20">
+            <div class="flex items-center justify-between pb-2.5 border-b border-slate-200">
+              <h3 class="font-bold text-base text-slate-900 flex items-center gap-2">
+                <span>🛒</span> Order Cart
+              </h3>
+              <button onclick="clearCart()" class="text-xs text-red-600 hover:text-red-700 font-semibold hover:underline">
+                Clear Cart
+              </button>
+            </div>
+
+            <!-- Cart Items Scrollable List -->
+            <div id="pos-cart-items" class="flex-1 overflow-y-auto py-2 space-y-2.5 custom-scrollbar divide-y divide-slate-100">
+              <!-- Cart items injected here -->
+            </div>
+
+            <!-- Cart Calculations & Checkout Controls -->
+            <div class="pt-3 border-t border-slate-200 space-y-2.5 bg-slate-50 p-3 rounded-lg border border-slate-200/80">
+              <div class="flex justify-between text-xs text-slate-600">
+                <span>Cart Summary:</span>
+                <span id="cart-item-count" class="font-semibold text-slate-800">0 items</span>
+              </div>
+
+              <div class="flex justify-between text-base font-bold text-slate-900 border-t border-slate-200 pt-2">
+                <span>Total Amount:</span>
+                <span id="cart-total-amount" class="text-brand-700 font-mono text-lg">₱0.00</span>
+              </div>
+
+              <!-- Payment Mode Selector -->
+              <div>
+                <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Payment Method:</label>
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <input type="radio" id="pay-cash" name="paymentType" value="Cash" checked onchange="toggleUtangFields()" class="hidden">
+                    <label for="pay-cash" class="flex items-center justify-center p-1.5 border border-slate-300 rounded cursor-pointer bg-white text-xs font-bold text-slate-700 hover:bg-slate-50">
+                      💵 CASH
+                    </label>
+                  </div>
+                  <div>
+                    <input type="radio" id="pay-utang" name="paymentType" value="Utang" onchange="toggleUtangFields()" class="hidden">
+                    <label for="pay-utang" class="flex items-center justify-center p-1.5 border border-slate-300 rounded cursor-pointer bg-white text-xs font-bold text-slate-700 hover:bg-slate-50">
+                      📖 CREDIT
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Cash Mode Controls -->
+              <div id="cash-payment-fields" class="space-y-1.5">
+                <div class="flex items-center gap-2">
+                  <span class="text-xs font-bold text-slate-700">Cash Received:</span>
+                  <input type="number" id="cash-tendered" placeholder="0.00" oninput="calculateChange()" class="w-full px-2.5 py-1 border border-slate-300 rounded text-right font-mono font-bold text-slate-900 text-sm focus:ring-1 focus:ring-brand-600 focus:outline-none">
+                </div>
+                <div class="flex justify-between text-xs font-semibold">
+                  <span class="text-slate-600">Change:</span>
+                  <span id="cash-change" class="text-emerald-700 font-mono font-bold">₱0.00</span>
+                </div>
+              </div>
+
+              <!-- Utang Mode Controls -->
+              <div id="utang-payment-fields" class="space-y-1.5 hidden">
+                <div>
+                  <label class="block text-[11px] font-bold text-slate-600">Customer Name:*</label>
+                  <input type="text" id="utang-customer-name" placeholder="e.g. Juan Dela Cruz" class="w-full px-2.5 py-1 border border-slate-300 rounded text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none">
+                </div>
+                <div>
+                  <label class="block text-[11px] font-bold text-slate-600">Phone Number (Optional):</label>
+                  <input type="text" id="utang-customer-phone" placeholder="09xxxxxxxxx" class="w-full px-2.5 py-1 border border-slate-300 rounded text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none">
+                </div>
+              </div>
+
+              <!-- Checkout Button -->
+              <button onclick="processCheckout()" class="w-full py-2.5 bg-brand-700 hover:bg-brand-800 text-white font-bold rounded shadow transition-colors flex items-center justify-center gap-2 text-sm mt-2">
+                ✓ Confirm & Process Transaction
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- 3. INVENTORY MANAGEMENT VIEW -->
+      <section id="view-inventory" class="tab-view hidden space-y-3">
+        
+        <!-- Inventory Action Header -->
+        <div class="bg-white p-3 rounded-lg border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-center gap-3">
+          <div class="flex items-center gap-2 w-full sm:w-auto">
+            <div class="relative w-full sm:w-64">
+              <span class="absolute left-3 top-2.5 text-slate-400 text-xs">🔍</span>
+              <input type="text" id="inventory-search" onkeyup="filterInventoryTable()" placeholder="Search Products..." class="w-full pl-8 pr-3 py-1.5 border border-slate-300 rounded text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-brand-600">
+            </div>
+            <select id="inventory-cat-filter" onchange="filterInventoryTable()" class="py-1.5 px-2.5 border border-slate-300 rounded text-xs sm:text-sm bg-white focus:outline-none">
+              <option value="All">All Categories</option>
+              <option value="Feeds">Feeds</option>
+              <option value="Rice">Rice</option>
+              <option value="Supplement">Supplement</option>
+              <option value="Softdrinks">Softdrinks</option>
+              <option value="Alcohol">Alcohol</option>
+              <option value="Cigarettes">Cigarettes</option>
+              <option value="Others">Others</option>
+            </select>
+          </div>
+
+          <button onclick="openProductModal()" class="w-full sm:w-auto px-3.5 py-2 bg-brand-700 hover:bg-brand-800 text-white font-bold text-xs rounded shadow-sm flex items-center justify-center gap-1.5 transition-colors">
+            ➕ Add New Product
+          </button>
+        </div>
+
+        <!-- Inventory Data Table -->
+        <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs sm:text-sm">
+              <thead class="bg-slate-50 text-slate-600 text-[11px] uppercase font-bold border-b border-slate-200">
+                <tr>
+                  <th class="p-3">Product Name</th>
+                  <th class="p-3">Category</th>
+                  <th class="p-3">Price / Sack</th>
+                  <th class="p-3">Price / Kilo</th>
+                  <th class="p-3">Sack Weight</th>
+                  <th class="p-3">Current Stock</th>
+                  <th class="p-3 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody id="inventory-table-body" class="divide-y divide-slate-100">
+                <!-- Injected Dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- 4. UTANG (CREDIT) LEDGER VIEW -->
+      <section id="view-credit" class="tab-view hidden space-y-3">
+        <!-- Header Controls -->
+        <div class="bg-white p-3 rounded-lg border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-center gap-3">
+          <div class="relative w-full sm:w-72">
+            <span class="absolute left-3 top-2.5 text-slate-400 text-xs">🔍</span>
+            <input type="text" id="utang-search" onkeyup="renderUtangLedger()" placeholder="Search Customer Name..." class="w-full pl-8 pr-3 py-1.5 border border-slate-300 rounded text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-amber-500">
+          </div>
+          <button onclick="openNewUtangModal()" class="w-full sm:w-auto px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded shadow-sm flex items-center justify-center gap-1.5 transition-colors">
+            👤 Manual Record Credit
+          </button>
+        </div>
+
+        <!-- Utang Cards / List -->
+        <div id="utang-ledger-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          <!-- Injected Dynamically -->
+        </div>
+      </section>
+
+      <!-- 5. SALES REPORTS VIEW -->
+      <section id="view-reports" class="tab-view hidden space-y-4">
+        
+        <!-- Summary Strip -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+            <p class="text-[11px] font-bold text-slate-500 uppercase">Total Overall Sales</p>
+            <p id="report-total-sales" class="text-xl sm:text-2xl font-extrabold text-brand-700 mt-1 font-mono">₱0.00</p>
+          </div>
+          <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+            <p class="text-[11px] font-bold text-slate-500 uppercase">Cash Transactions</p>
+            <p id="report-total-cash" class="text-xl sm:text-2xl font-extrabold text-emerald-700 mt-1 font-mono">₱0.00</p>
+          </div>
+          <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+            <p class="text-[11px] font-bold text-slate-500 uppercase">Credit / Unpaid Sales</p>
+            <p id="report-total-credit" class="text-xl sm:text-2xl font-extrabold text-red-600 mt-1 font-mono">₱0.00</p>
+          </div>
+        </div>
+
+        <!-- Offline Visual Summaries Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+            <h3 class="font-bold text-slate-800 text-xs uppercase tracking-wider mb-3">Sales Breakdown by Category</h3>
+            <div id="offline-cat-summary" class="space-y-3">
+              <!-- Pure HTML/CSS Bar Breakdown -->
+            </div>
+          </div>
+          <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+            <h3 class="font-bold text-slate-800 text-xs uppercase tracking-wider mb-3">Top Selling Items</h3>
+            <div id="offline-bestseller-summary" class="space-y-3">
+              <!-- Pure HTML/CSS Breakdown -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Sales Log Table -->
+        <div class="bg-white rounded-lg border border-slate-200 shadow-sm p-4 space-y-3">
+          <h3 class="font-bold text-slate-800 text-xs uppercase tracking-wider">Transaction History Log</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead class="bg-slate-50 text-slate-600 text-[11px] uppercase font-bold border-b border-slate-200">
+                <tr>
+                  <th class="p-2">Txn ID</th>
+                  <th class="p-2">Date & Time</th>
+                  <th class="p-2">Customer</th>
+                  <th class="p-2">Method</th>
+                  <th class="p-2">Items Sold</th>
+                  <th class="p-2 text-right">Total Amount</th>
+                </tr>
+              </thead>
+              <tbody id="sales-report-table-body" class="divide-y divide-slate-100 font-sans">
+                <!-- Injected Dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- 6. CASH OUT / EXPENSES VIEW -->
+      <section id="view-cashout" class="tab-view hidden space-y-4">
+        <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+          <h2 class="text-base font-bold text-slate-900">Cash Out / Expenses</h2>
+          <p class="text-xs text-slate-500 mt-1">Record money taken from the cash drawer.</p>
+          <form id="cashout-form" onsubmit="recordCashOut(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
+            <div>
+              <label class="block text-[11px] font-bold text-slate-600 mb-1">Expense Type</label>
+              <select id="cashout-category" required class="w-full px-2.5 py-2 border border-slate-300 rounded text-xs bg-white">
+                <option value="Food Allowance">Food Allowance</option>
+                <option value="Gas Allowance">Gas Allowance</option>
+                <option value="Remit Cash">Remit Cash</option>
+                <option value="Other Expenses">Other Expenses</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-slate-600 mb-1">Amount (₱)</label>
+              <input id="cashout-amount" type="number" min="0.01" step="0.01" required placeholder="0.00" class="w-full px-2.5 py-2 border border-slate-300 rounded text-xs font-mono">
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-slate-600 mb-1">Details / Remarks</label>
+              <input id="cashout-remarks" type="text" placeholder="Optional details" class="w-full px-2.5 py-2 border border-slate-300 rounded text-xs">
+            </div>
+            <div class="flex items-end">
+              <button type="submit" class="w-full px-3 py-2 bg-brand-700 hover:bg-brand-800 text-white font-bold text-xs rounded">Record Cash Out</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div class="bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+            <p class="text-[10px] font-bold text-slate-500 uppercase">Food Allowance</p>
+            <p id="cashout-food-total" class="text-lg font-extrabold font-mono text-slate-900 mt-1">₱0.00</p>
+          </div>
+          <div class="bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+            <p class="text-[10px] font-bold text-slate-500 uppercase">Gas Allowance</p>
+            <p id="cashout-gas-total" class="text-lg font-extrabold font-mono text-slate-900 mt-1">₱0.00</p>
+          </div>
+          <div class="bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+            <p class="text-[10px] font-bold text-slate-500 uppercase">Remit Cash</p>
+            <p id="cashout-remit-total" class="text-lg font-extrabold font-mono text-slate-900 mt-1">₱0.00</p>
+          </div>
+          <div class="bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+            <p class="text-[10px] font-bold text-slate-500 uppercase">Other Expenses</p>
+            <p id="cashout-other-total" class="text-lg font-extrabold font-mono text-slate-900 mt-1">₱0.00</p>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-lg border border-slate-200 shadow-sm p-4">
+          <div class="flex justify-between items-center mb-3">
+            <h3 class="font-bold text-slate-800 text-sm">Cash Out History</h3>
+            <p id="cashout-grand-total" class="font-bold text-red-600 font-mono text-sm">Total: ₱0.00</p>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-50 text-slate-600 text-[11px] uppercase font-bold">
+                <tr><th class="p-2">Date & Time</th><th class="p-2">Expense Type</th><th class="p-2">Details</th><th class="p-2 text-right">Amount</th></tr>
+              </thead>
+              <tbody id="cashout-history-body" class="divide-y divide-slate-100">
+                <tr><td colspan="4" class="p-4 text-center text-slate-400">No cash out records yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- MODALS & DIALOG OVERLAYS -->
+
+  <!-- 1. PRODUCT ADD/EDIT MODAL -->
+  <div id="modal-product" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center hidden p-3">
+    <div class="bg-white rounded-lg max-w-lg w-full p-5 shadow-xl space-y-4 max-h-[90vh] overflow-y-auto border border-slate-200">
+      <div class="flex justify-between items-center border-b pb-2">
+        <h3 id="modal-product-title" class="font-bold text-base text-slate-900">Add New Product</h3>
+        <button onclick="closeProductModal()" class="text-slate-400 hover:text-slate-600 font-bold text-lg">✕</button>
+      </div>
+      
+      <form id="product-form" onsubmit="saveProduct(event)" class="space-y-3 text-xs">
+        <input type="hidden" id="prod-id">
+        
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Product Name / Brand</label>
+          <input type="text" id="prod-name" required placeholder="e.g. Pigrolac Starter Pellets or Dinorado Rice" class="w-full px-2.5 py-1.5 border rounded text-xs focus:ring-1 focus:ring-brand-600 focus:outline-none">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Category</label>
+            <select id="prod-category" class="w-full px-2.5 py-1.5 border rounded text-xs focus:ring-1 focus:ring-brand-600 focus:outline-none bg-white">
+              <option value="Feeds">Feeds</option>
+              <option value="Rice">Rice</option>
+              <option value="Supplement">Supplement / Vitamins</option>
+              <option value="Softdrinks">Softdrinks</option>
+              <option value="Alcohol">Alcohol</option>
+              <option value="Cigarettes">Cigarettes</option>
+              <option value="Others">Others</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Sack Weight (Kg)</label>
+            <input type="number" id="prod-weight" required min="1" value="50" class="w-full px-2.5 py-1.5 border rounded text-xs focus:ring-1 focus:ring-brand-600 focus:outline-none">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Price per SACK (₱)</label>
+            <input type="number" step="0.01" id="prod-price-sack" required placeholder="1450.00" class="w-full px-2.5 py-1.5 border rounded text-xs focus:ring-1 focus:ring-brand-600 focus:outline-none font-mono">
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Price per KILO (₱)</label>
+            <input type="number" step="0.01" id="prod-price-kilo" required placeholder="32.00" class="w-full px-2.5 py-1.5 border rounded text-xs focus:ring-1 focus:ring-brand-600 focus:outline-none font-mono">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Sack Stock Count</label>
+            <input type="number" id="prod-stock-sacks" required min="0" value="10" class="w-full px-2.5 py-1.5 border rounded text-xs focus:ring-1 focus:ring-brand-600 focus:outline-none">
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Open Sacks Count</label>
+            <input type="number" id="prod-open-sacks" required min="0" value="0" class="w-full px-2.5 py-1.5 border rounded text-xs focus:ring-1 focus:ring-brand-600 focus:outline-none">
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Low Stock Alert Threshold (Sacks)</label>
+          <input type="number" id="prod-low-threshold" required min="1" value="10" placeholder="e.g. 5 or 10" class="w-full px-2.5 py-1.5 border rounded text-xs focus:ring-1 focus:ring-brand-600 focus:outline-none">
+          <p class="text-[10px] text-slate-400 mt-0.5">Alerts trigger when stock reaches or falls below this number.</p>
+        </div>
+
+        <div class="pt-3 border-t border-slate-100 flex justify-end gap-2">
+          <button type="button" onclick="closeProductModal()" class="px-3 py-1.5 border rounded font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
+          <button type="submit" class="px-4 py-1.5 bg-brand-700 hover:bg-brand-800 text-white rounded font-bold">Save Item</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 2. PAYMENT / RECEIPT MODAL -->
+  <div id="modal-receipt" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center hidden p-3">
+    <div class="bg-white rounded-lg max-w-sm w-full p-4 shadow-2xl space-y-3 border border-slate-200">
+      
+      <!-- Printable Container -->
+      <div id="printable-receipt" class="text-slate-900 text-xs space-y-2 font-mono border border-slate-300 p-3 rounded bg-white">
+        <div class="text-center">
+          <h2 class="font-bold text-sm uppercase tracking-wide">AgriFeed & Rice Supply</h2>
+          <p class="text-[10px] text-slate-500">Public Market, Main Street</p>
+          <p class="text-[10px] text-slate-500">Contact: 0912-345-6789</p>
+          <div class="border-b border-dashed border-slate-400 my-1.5"></div>
+          <p id="receipt-date-time" class="text-[10px] text-slate-500"></p>
+          <p id="receipt-txn-id" class="text-[11px] font-bold text-slate-800"></p>
+        </div>
+
+        <div class="border-b border-dashed border-slate-400 my-1.5"></div>
+
+        <div id="receipt-items-list" class="space-y-1 text-[11px]">
+          <!-- Items injected dynamically -->
+        </div>
+
+        <div class="border-b border-dashed border-slate-400 my-1.5"></div>
+
+        <div class="space-y-1 text-[11px]">
+          <div class="flex justify-between font-bold text-xs">
+            <span>TOTAL AMOUNT:</span>
+            <span id="receipt-total">₱0.00</span>
+          </div>
+          <div class="flex justify-between text-slate-600">
+            <span>Payment Type:</span>
+            <span id="receipt-payment-type">CASH</span>
+          </div>
+          <div id="receipt-cash-row" class="flex justify-between text-slate-600">
+            <span>Amount Received:</span>
+            <span id="receipt-cash">₱0.00</span>
+          </div>
+          <div id="receipt-change-row" class="flex justify-between text-slate-600">
+            <span>Change:</span>
+            <span id="receipt-change">₱0.00</span>
+          </div>
+          <div id="receipt-customer-row" class="flex justify-between text-slate-600 hidden">
+            <span>Customer:</span>
+            <span id="receipt-customer-name">-</span>
+          </div>
+        </div>
+
+        <div class="border-b border-dashed border-slate-400 my-1.5"></div>
+        <p class="text-center text-[10px] text-slate-500">Salamat sa inyong pagtangkilik!</p>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex gap-2 pt-1">
+        <button onclick="window.print()" class="flex-1 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold rounded text-xs flex items-center justify-center gap-1 transition-colors">
+          🖨️ Print Receipt
+        </button>
+        <button onclick="closeReceiptModal()" class="flex-1 py-2 bg-brand-700 hover:bg-brand-800 text-white font-bold rounded text-xs transition-colors">
+          Done
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 3. UTANG PAYMENT MODAL -->
+  <div id="modal-utang-pay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center hidden p-3">
+    <div class="bg-white rounded-lg max-w-sm w-full p-4 shadow-xl space-y-3 border border-slate-200">
+      <div class="flex justify-between items-center border-b pb-2">
+        <h3 class="font-bold text-slate-800 text-sm">Pay Outstanding Credit</h3>
+        <button onclick="closeUtangPayModal()" class="text-slate-400 font-bold">✕</button>
+      </div>
+      <div>
+        <p class="text-[11px] text-slate-500">Customer Name:</p>
+        <h4 id="utang-pay-name" class="font-bold text-slate-900 text-sm"></h4>
+        <p class="text-[11px] text-slate-500 mt-1">Current Balance:</p>
+        <p id="utang-pay-balance" class="text-lg font-extrabold text-red-600 font-mono"></p>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Amount Paid (₱):</label>
+        <input type="number" id="utang-pay-amount" placeholder="0.00" class="w-full px-2.5 py-1.5 border rounded font-mono font-bold text-base text-emerald-700 focus:ring-1 focus:ring-emerald-600 focus:outline-none">
+      </div>
+      <div class="flex gap-2 pt-1">
+        <button onclick="closeUtangPayModal()" class="flex-1 py-1.5 border rounded text-xs font-semibold text-slate-600">Cancel</button>
+        <button onclick="processUtangPayment()" class="flex-1 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded text-xs">Confirm Payment</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. MANUAL NEW UTANG MODAL -->
+  <div id="modal-new-utang" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center hidden p-3">
+    <div class="bg-white rounded-lg max-w-sm w-full p-4 shadow-xl space-y-3 border border-slate-200">
+      <div class="flex justify-between items-center border-b pb-2">
+        <h3 class="font-bold text-slate-800 text-sm">Record Manual Credit</h3>
+        <button onclick="closeNewUtangModal()" class="text-slate-400 font-bold">✕</button>
+      </div>
+      <form onsubmit="saveManualUtang(event)" class="space-y-2.5 text-xs">
+        <div>
+          <label class="block font-bold text-slate-700 mb-0.5">Customer Name*</label>
+          <input type="text" id="manual-utang-name" required placeholder="Juan Dela Cruz" class="w-full px-2.5 py-1.5 border rounded focus:outline-none focus:ring-1 focus:ring-amber-500">
+        </div>
+        <div>
+          <label class="block font-bold text-slate-700 mb-0.5">Phone Number</label>
+          <input type="text" id="manual-utang-phone" placeholder="09xxxxxxxxx" class="w-full px-2.5 py-1.5 border rounded focus:outline-none focus:ring-1 focus:ring-amber-500">
+        </div>
+        <div>
+          <label class="block font-bold text-slate-700 mb-0.5">Credit Amount (₱)*</label>
+          <input type="number" step="0.01" id="manual-utang-amount" required placeholder="0.00" class="w-full px-2.5 py-1.5 border rounded font-mono font-bold focus:outline-none focus:ring-1 focus:ring-amber-500">
+        </div>
+        <div>
+          <label class="block font-bold text-slate-700 mb-0.5">Details / Items Taken</label>
+          <textarea id="manual-utang-notes" placeholder="e.g. 2 sacks Hog Starter" class="w-full px-2.5 py-1.5 border rounded focus:outline-none focus:ring-1 focus:ring-amber-500 h-16"></textarea>
+        </div>
+        <div class="flex gap-2 pt-2">
+          <button type="button" onclick="closeNewUtangModal()" class="flex-1 py-1.5 border rounded font-semibold text-slate-600">Cancel</button>
+          <button type="submit" class="flex-1 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded">Save Credit</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- NOTIFICATION TOAST CONTAINER -->
+  <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- SYSTEM JAVASCRIPT ENGINE -->
+  <script src="./app.js" defer></script>
+  <script>if ("serviceWorker" in navigator && location.protocol !== "file:") { window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js").catch(() => {})); }</script>
+</body>
+</html>

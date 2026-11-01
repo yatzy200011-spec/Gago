@@ -1,0 +1,12 @@
+{
+  "name": "AgriFeed & Rice Supply - Store Operations System",
+  "short_name": "AgriFeed POS",
+  "description": "Offline point-of-sale, inventory, credit ledger, reports, and cash-out system.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f1f5f9",
+  "theme_color": "#14532d",
+  "lang": "en",
+  "orientation": "any"
+}
